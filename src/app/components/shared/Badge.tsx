@@ -1,8 +1,8 @@
 type BadgeVariant =
   | 'confirmed' | 'entitlement' | 'discount'
   | 'pending' | 'cancelled'
-  | 'active' | 'paused' | 'exhausted'
-  | 'requested' | 'available';
+  | 'active' | 'exhausted' | 'low' | 'unlimited' | 'inactive'
+  | 'requested' | 'available' | 'payg';
 
 const STYLES: Record<BadgeVariant, string> = {
   confirmed:   'bg-[#dcfce7] text-[#166534]',
@@ -10,11 +10,14 @@ const STYLES: Record<BadgeVariant, string> = {
   entitlement: 'bg-[#d1fae5] text-[#0a2333]',
   discount:    'bg-[#ccfbf1] text-[#134e4a]',
   pending:     'bg-[#fef9c3] text-[#854d0e]',
-  paused:      'bg-[#FEF3C7] text-[#92400E]',
+  low:         'bg-[#fef9c3] text-[#854d0e]',
+  unlimited:   'bg-[#dbeafe] text-[#1e40af]',
+  inactive:    'bg-[#f3f4f6] text-[#6a7282]',
   requested:   'bg-[#FEF3C7] text-[#92400E]',
   cancelled:   'bg-[#fee2e2] text-[#991b1b]',
   exhausted:   'bg-[#fee2e2] text-[#991b1b]',
   available:   'bg-[#f3f4f6] text-[#374151]',
+  payg:       'bg-[#FEF3C7] text-[#92400E]',
 };
 
 interface BadgeProps {

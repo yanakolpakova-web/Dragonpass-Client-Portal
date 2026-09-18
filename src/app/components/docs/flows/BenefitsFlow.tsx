@@ -155,7 +155,7 @@ export const benefitsFrames: Frame[] = [
   {
     id: 'benefits-list-prod',
     title: 'Benefits List — Production',
-    description: '5 entitlement cards in production environment. Shows active, paused, and exhausted statuses with usage indicators.',
+    description: 'Entitlement cards in production environment. Shows active, low and exhausted statuses with usage indicators.',
     category: 'List Views',
     render: () => (
       <BenefitsPageShell>
@@ -218,7 +218,7 @@ export const benefitsFrames: Frame[] = [
       <BenefitsPageShell>
         <BenefitsHeader search="xyz123">
           <div className="flex-1 overflow-auto px-8">
-            <EntitlementsEmptyState onBrowseCategories={() => {}} />
+            <EntitlementsEmptyState onBrowseCategories={() => {}} filtered />
           </div>
         </BenefitsHeader>
       </BenefitsPageShell>
@@ -297,24 +297,6 @@ export const benefitsFrames: Frame[] = [
     },
   },
   {
-    id: 'benefits-card-paused',
-    title: 'Card — Paused (Resume)',
-    description: 'Paused entitlement shows amber "Paused" badge and solid "Resume" button in footer.',
-    category: 'Card States',
-    render: () => {
-      const ent = prodEntitlements.find(e => e.status === 'paused')!;
-      return (
-        <BenefitsPageShell>
-          <div className="px-8 pt-8">
-            <div className="max-w-md">
-              <EntitlementCard entitlement={ent} onClick={() => {}} />
-            </div>
-          </div>
-        </BenefitsPageShell>
-      );
-    },
-  },
-  {
     id: 'benefits-card-exhausted',
     title: 'Card — Exhausted (Restart)',
     description: 'Exhausted entitlement shows red "Exhausted" badge, "Cap reached" warning, and solid "Restart" button.',
@@ -360,20 +342,6 @@ export const benefitsFrames: Frame[] = [
     category: 'Detail Pages',
     render: () => {
       const ent = prodEntitlements.find(e => e.status === 'active')!;
-      return (
-        <DocFrame>
-          <EntitlementDetailPage entitlement={ent} activeView="entitlements" onNavigate={() => {}} onBack={() => {}} />
-        </DocFrame>
-      );
-    },
-  },
-  {
-    id: 'benefits-detail-paused',
-    title: 'Detail Page — Paused',
-    description: 'Detail page for a paused entitlement. Shows "Resume benefit" button (solid dark).',
-    category: 'Detail Pages',
-    render: () => {
-      const ent = prodEntitlements.find(e => e.status === 'paused')!;
       return (
         <DocFrame>
           <EntitlementDetailPage entitlement={ent} activeView="entitlements" onNavigate={() => {}} onBack={() => {}} />

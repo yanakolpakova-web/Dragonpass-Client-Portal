@@ -13,6 +13,7 @@ const iconMap: Record<string, React.ElementType> = {
 const statusLabels: Record<string, string> = {
   active: 'ACTIVE',
   available: 'AVAILABLE',
+  payg: 'PAY AS YOU GO',
   requested: 'REQUESTED',
 };
 
@@ -50,7 +51,7 @@ export function ProductDetailView({ slug, onBack, backLabel = 'Back to Categorie
               <p className="font-['Cabin',sans-serif] text-[13px] text-[#6a7282]">{product.shortDescription}</p>
             </div>
           </div>
-          <Badge variant={product.clientStatus as 'active' | 'available' | 'requested'} className="px-2.5 py-1 text-[11px]">
+          <Badge variant={product.clientStatus as 'active' | 'available' | 'requested' | 'payg'} className="px-2.5 py-1 text-[11px]">
             {statusLabels[product.clientStatus]}
           </Badge>
         </div>

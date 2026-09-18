@@ -88,7 +88,7 @@ export const environmentFrames: Frame[] = [
                   <div key={e.id} className="bg-white rounded-lg border border-[#e5e7eb] px-4 py-3 flex items-center justify-between">
                     <span className="font-['Cabin',sans-serif] text-[13px] text-[#0a2333] font-medium">{e.productName}</span>
                     <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold font-['Cabin',sans-serif] ${
-                      e.status === 'active' ? 'bg-[#dcfce7] text-[#166534]' : e.status === 'paused' ? 'bg-[#FEF3C7] text-[#92400E]' : 'bg-[#fee2e2] text-[#991b1b]'
+                      e.status === 'active' ? 'bg-[#dcfce7] text-[#166534]' : 'bg-[#fee2e2] text-[#991b1b]'
                     }`}>
                       {e.status}
                     </span>

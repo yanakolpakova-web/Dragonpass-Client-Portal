@@ -8,12 +8,14 @@ const iconMap: Record<string, React.ElementType> = {
 const statusStyles: Record<string, string> = {
   active: 'bg-[#dcfce7] text-[#166534]',
   available: 'bg-[#f3f4f6] text-[#374151]',
+  payg: 'bg-[#FEF3C7] text-[#92400E]',
   requested: 'bg-[#FEF3C7] text-[#92400E]',
 };
 
 const statusLabels: Record<string, string> = {
   active: 'ACTIVE',
   available: 'AVAILABLE',
+  payg: 'PAY AS YOU GO',
   requested: 'REQUESTED',
 };
 

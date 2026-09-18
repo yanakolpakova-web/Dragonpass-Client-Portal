@@ -33,7 +33,7 @@ export interface Entitlement {
   used: number;
   remaining: number;
   cap: number | null;
-  status: 'active' | 'paused' | 'exhausted';
+  status: 'active' | 'exhausted';
   alertThresholds: {
     enabled: boolean;
     thresholds: number[];
@@ -61,7 +61,7 @@ export interface Product {
   benefits: ProductBenefit[];
   integrationGuide: string;
   documentationUrl: string;
-  clientStatus: 'active' | 'available' | 'requested';
+  clientStatus: 'active' | 'available' | 'requested' | 'payg';
   unitCostGBP: number;
 }
 

@@ -30,7 +30,7 @@ export const CATALOG_PRODUCTS: Product[] = [
     ],
     integrationGuide: 'Use /hotels/search for property discovery with location, date, and guest parameters. Complete bookings via /hotels/book with room selection and guest details. Supports modification and cancellation flows.',
     documentationUrl: 'https://docs.dragonpass.com/hotels',
-    clientStatus: 'active',
+    clientStatus: 'payg',
     unitCostGBP: 65.00,
   },
   {

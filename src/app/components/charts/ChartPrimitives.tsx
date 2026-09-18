@@ -1,5 +1,5 @@
 import {
-  BarChart, Bar, LineChart, Line, AreaChart, Area,
+  BarChart, Bar, LineChart, Line, AreaChart, Area, ComposedChart,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
   PieChart, Pie, Cell,
 } from 'recharts';
@@ -62,6 +62,55 @@ export function SimpleBarChart({
           />
         ))}
       </BarChart>
+    </ResponsiveContainer>
+  );
+}
+
+// ── Usage Combo Chart (bars + trend line) ───────────────────
+interface UsageComboChartProps {
+  data: Record<string, unknown>[];
+  xKey: string;
+  dataKey: string;
+  name?: string;
+  height?: number;
+  barSize?: number;
+  barColor?: string;
+  lineColor?: string;
+  labelFormatter?: (label: string) => string;
+  showLegend?: boolean;
+}
+
+export function UsageComboChart({
+  data, xKey, dataKey, name = 'Usage', height = 230,
+  barSize = 16, barColor = CHART_COLORS.teal, lineColor = CHART_COLORS.navy,
+  labelFormatter, showLegend = true,
+}: UsageComboChartProps) {
+  return (
+    <ResponsiveContainer width="100%" height={height}>
+      <ComposedChart data={data}>
+        <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" vertical={false} />
+        <XAxis dataKey={xKey} tick={CHART_FONT} axisLine={false} tickLine={false} interval="preserveStartEnd" minTickGap={16} />
+        <YAxis tick={CHART_FONT} axisLine={false} tickLine={false} />
+        <Tooltip
+          {...TOOLTIP_STYLE}
+          labelFormatter={labelFormatter}
+          labelStyle={{ color: '#6a7282' }}
+          itemStyle={{ color: '#0a2333', fontSize: 13, fontWeight: 600 }}
+          /* null name drops the "Usage :" prefix, leaving the amount alone. */
+          formatter={((value: number) => [value, null]) as never}
+        />
+        {showLegend && (
+          /* recharts colours legend text by series; override to secondary text. */
+          <Legend
+            {...LEGEND_STYLE}
+            formatter={(value: string) => (
+              <span style={{ color: '#6a7282' }}>{value}</span>
+            )}
+          />
+        )}
+        <Bar dataKey={dataKey} name={name} fill={barColor} radius={[4, 4, 0, 0]} barSize={barSize} />
+        <Line type="monotone" dataKey={dataKey} name="Trend" stroke={lineColor} strokeWidth={2} dot={false} activeDot={false} legendType="plainline" tooltipType="none" />
+      </ComposedChart>
     </ResponsiveContainer>
   );
 }

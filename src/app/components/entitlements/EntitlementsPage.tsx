@@ -1,19 +1,82 @@
 import { useState, useEffect, useRef } from 'react';
-import { Search, SlidersHorizontal, ChevronDown, Check } from 'lucide-react';
+import { ArrowDownUp, ChevronDown, Check } from 'lucide-react';
 import { PageShell } from '../shared/PageShell';
+import { SearchInput } from '../shared/SearchInput';
 import { TestModeBadge } from '../shared/TestModeBadge';
-import { EntitlementCard } from './EntitlementCard';
+import { EntitlementCard, InactiveCategoryCard, PayAsYouGoCard } from './EntitlementCard';
 import { EntitlementsEmptyState } from './EntitlementsEmptyState';
+import { EntitlementsSummaryBanner } from './EntitlementsSummaryBanner';
 import { EntitlementDetailPage } from './EntitlementDetailPage';
 import { ProductDetailView } from './ProductDetailView';
 import { EntitlementsSkeleton } from '../shared/Skeleton';
 import { MOCK_ENTITLEMENTS } from './mockEntitlements';
+import { CATALOG_PRODUCTS } from './catalogData';
+import type { Entitlement, Product } from '../../types/portalTypes';
+import { benefitStatusRank, averageUsageRate } from './benefitStatus';
 import { useEnvironment } from '../../contexts/EnvironmentContext';
+
+export const ALL_BENEFITS_ID = '__all__';
+
+// A category with no entitlement (pay-as-you-go, or one this channel does not
+// carry) still opens a detail page, so stand in a zero record for it.
+function emptyEntitlement(product: Product, environment: 'test' | 'production'): Entitlement {
+  return {
+    id: `category-${product.slug}`,
+    productSlug: product.slug,
+    productName: product.name,
+    productIcon: product.icon,
+    description: product.shortDescription,
+    environment,
+    benefitType: 'entitlement',
+    unitCostGBP: product.unitCostGBP,
+    allocation: 0,
+    used: 0,
+    remaining: 0,
+    cap: 0,
+    status: 'active',
+    alertThresholds: { enabled: false, thresholds: [], recipients: [] },
+    lastAlertedThreshold: null,
+    startDate: '',
+    createdAt: '',
+    updatedAt: '',
+  };
+}
+
+// Stands in for "every benefit at once" so the detail page can render the same
+// aggregate the summary banner shows.
+function aggregateEntitlement(entitlements: Entitlement[], environment: 'test' | 'production'): Entitlement {
+  const limited = entitlements.filter(e => e.cap !== null && e.cap !== undefined);
+  const hasUnlimited = limited.length < entitlements.length;
+  const limitedAllocation = limited.reduce((sum, e) => sum + (e.cap ?? e.allocation), 0);
+
+  return {
+    id: ALL_BENEFITS_ID,
+    productSlug: 'all',
+    productName: 'All Entitlements',
+    productIcon: 'Layers',
+    description: 'Combined point pool across all entitlements',
+    environment,
+    benefitType: 'entitlement',
+    unitCostGBP: 0,
+    allocation: limitedAllocation,
+    used: entitlements.reduce((sum, e) => sum + e.used, 0),
+    remaining: limited.reduce((sum, e) => sum + e.remaining, 0),
+    // Any unlimited benefit makes the combined pool infinite.
+    cap: hasUnlimited ? null : limitedAllocation,
+    status: 'active',
+    alertThresholds: { enabled: false, thresholds: [], recipients: [] },
+    lastAlertedThreshold: null,
+    startDate: '',
+    createdAt: '',
+    updatedAt: '',
+  };
+}
 
 const SORT_OPTIONS = [
   { value: 'name', label: 'Name' },
-  { value: 'usage', label: 'Usage %' },
   { value: 'remaining', label: 'Remaining' },
+  { value: 'status', label: 'Status' },
+  { value: 'usage', label: 'Usage' },
 ] as const;
 
 type SortOption = typeof SORT_OPTIONS[number]['value'];
@@ -38,7 +101,7 @@ function SortDropdown({ value, onChange }: { value: SortOption; onChange: (v: So
         onClick={() => setOpen(v => !v)}
         className="cursor-pointer flex items-center gap-1.5 h-9 px-3 rounded-lg border border-[#e5e7eb] bg-white font-['Cabin',sans-serif] text-[13px] text-[#45556c] hover:bg-[#f9fafb] transition-colors"
       >
-        <SlidersHorizontal size={13} />
+        <ArrowDownUp size={13} />
         <span>Sort:</span>
         <span className="text-[#0a2333] font-medium">{current.label}</span>
         <ChevronDown size={12} className="text-[#9ca3af]" />
@@ -70,8 +133,9 @@ export function EntitlementsPage({ activeView, onNavigate }: EntitlementsPagePro
   const [loading, setLoading] = useState(true);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [search, setSearch] = useState('');
-  const [sortBy, setSortBy] = useState<'name' | 'usage' | 'remaining'>('name');
+  const [sortBy, setSortBy] = useState<SortOption>('usage');
   const { environment } = useEnvironment();
+  const gridRef = useRef<HTMLDivElement>(null);
 
   const parts = activeView.split(':');
   const isProductDetail = parts[1] === 'product' && parts[2];
@@ -101,12 +165,28 @@ export function EntitlementsPage({ activeView, onNavigate }: EntitlementsPagePro
     );
   }
 
-  const selectedEntitlement = selectedId ? MOCK_ENTITLEMENTS.find(e => e.id === selectedId) : null;
+  const environmentEntitlements = MOCK_ENTITLEMENTS.filter(e => e.environment === environment);
+  const selectedProduct = selectedId && selectedId !== ALL_BENEFITS_ID
+    ? CATALOG_PRODUCTS.find(p => p.slug === selectedId)
+    : null;
+  const selectedRecord = selectedProduct
+    ? environmentEntitlements.find(e => e.productSlug === selectedProduct.slug)
+    : undefined;
+  const selectedEntitlement = selectedId === ALL_BENEFITS_ID
+    ? aggregateEntitlement(environmentEntitlements, environment)
+    : selectedProduct
+      ? selectedRecord ?? emptyEntitlement(selectedProduct, environment)
+      : null;
+  const selectedCategoryState = !selectedProduct || selectedRecord
+    ? undefined
+    : selectedProduct.clientStatus === 'payg' ? 'payg' as const : 'inactive' as const;
 
   if (selectedEntitlement) {
     return (
       <EntitlementDetailPage
         entitlement={selectedEntitlement}
+        categoryState={selectedCategoryState}
+        usageRate={selectedId === ALL_BENEFITS_ID ? averageUsageRate(environmentEntitlements) : undefined}
         activeView={activeView}
         onNavigate={onNavigate}
         onBack={() => setSelectedId(null)}
@@ -114,24 +194,56 @@ export function EntitlementsPage({ activeView, onNavigate }: EntitlementsPagePro
     );
   }
 
-  let entitlements = MOCK_ENTITLEMENTS.filter(e => e.environment === environment);
+  // AC-07: the grid lists every category Dragonpass supports, not only the ones
+  // this client holds. A category with no entitlement renders as Inactive.
+  let items = CATALOG_PRODUCTS.map(product => ({
+    product,
+    entitlement:
+      MOCK_ENTITLEMENTS.find(e => e.productSlug === product.slug && e.environment === environment) ?? null,
+  }));
 
   if (search.trim()) {
     const q = search.toLowerCase();
-    entitlements = entitlements.filter(e =>
-      e.productName.toLowerCase().includes(q) || e.description.toLowerCase().includes(q)
+    items = items.filter(({ product, entitlement }) =>
+      (entitlement?.productName ?? product.name).toLowerCase().includes(q) ||
+      (entitlement?.description ?? product.shortDescription).toLowerCase().includes(q)
     );
   }
 
-  entitlements = [...entitlements].sort((a, b) => {
-    if (sortBy === 'usage') return (b.used / (b.cap || b.allocation)) - (a.used / (a.cap || a.allocation));
-    if (sortBy === 'remaining') return a.remaining - b.remaining;
-    return a.productName.localeCompare(b.productName);
+  // Entitlements first, then pay-as-you-go, then categories this channel does
+  // not carry. Mirrors the order the cards are chosen in below.
+  const group = (i: (typeof items)[number]) =>
+    i.product.clientStatus === 'payg' ? 1 : i.entitlement ? 0 : 2;
+
+  items = [...items].sort((a, b) => {
+    if (group(a) !== group(b)) return group(a) - group(b);
+
+    const x = a.entitlement;
+    const y = b.entitlement;
+    // Nothing to rank on without an entitlement, so order by name.
+    if (!x || !y) return a.product.name.localeCompare(b.product.name);
+
+    // AC-09: usage means total entitlements used, not a percentage of cap, so
+    // limited and unlimited benefits rank on the same scale.
+    if (sortBy === 'usage') return y.used - x.used || x.productName.localeCompare(y.productName);
+    if (sortBy === 'remaining') {
+      // Unlimited first (an infinite balance outranks any number), then limited
+      // benefits by remaining balance descending.
+      const group = (e: typeof x) => (e.cap === null || e.cap === undefined ? 0 : 1);
+      if (group(x) !== group(y)) return group(x) - group(y);
+      // Unlimited balances are all infinite, so there is nothing to rank them by.
+      if (group(x) === 1 && x.remaining !== y.remaining) return y.remaining - x.remaining;
+      return x.productName.localeCompare(y.productName);
+    }
+    if (sortBy === 'status') return benefitStatusRank(x) - benefitStatusRank(y) || x.productName.localeCompare(y.productName);
+    return x.productName.localeCompare(y.productName);
   });
+
+  const entitlements = items.map(i => i.entitlement).filter((e): e is NonNullable<typeof e> => e !== null);
 
   return (
     <PageShell activeView={activeView} onNavigate={onNavigate}>
-      <div className="flex flex-col flex-1 overflow-hidden w-full max-w-[1440px] mx-auto">
+      <div className="flex flex-col flex-1 overflow-auto w-full max-w-[1440px] mx-auto">
         {/* Header */}
         <div className="px-8 pt-5 pb-4 shrink-0">
           <div className="flex items-center justify-between">
@@ -148,33 +260,39 @@ export function EntitlementsPage({ activeView, onNavigate }: EntitlementsPagePro
 
           {/* Filter bar */}
           <div className="flex items-center gap-3 mt-4">
-            <div className="relative flex-1 max-w-xs">
-              <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#9ca3af]" />
-              <input
-                type="text"
-                placeholder="Search benefits..."
-                value={search}
-                onChange={e => setSearch(e.target.value)}
-                className="w-full h-9 pl-8 pr-3 rounded-lg border border-[#e5e7eb] text-[13px] font-['Cabin',sans-serif] text-[#0a2333] placeholder-[#9ca3af] focus:outline-none focus:border-[#0a2333] bg-[#f9fafb]"
-              />
-            </div>
+            <SearchInput
+              value={search}
+              onChange={setSearch}
+              placeholder="Search benefits..."
+              className="flex-1 max-w-xs"
+            />
             <SortDropdown value={sortBy} onChange={setSortBy} />
           </div>
         </div>
 
         {/* Content */}
-        <div className="flex-1 overflow-auto px-8 pb-8">
-          {entitlements.length === 0 ? (
-            <EntitlementsEmptyState onBrowseCategories={() => onNavigate('settings:categories')} />
+        <div className="px-8 pb-8">
+          {entitlements.length > 0 && (
+            <div className="pt-4">
+              <EntitlementsSummaryBanner
+                entitlements={entitlements}
+                onClick={() => setSelectedId(ALL_BENEFITS_ID)}
+              />
+            </div>
+          )}
+          {items.length === 0 ? (
+            <EntitlementsEmptyState onBrowseCategories={() => onNavigate('settings:categories')} filtered={search.trim().length > 0} />
           ) : (
-            <div className="py-4 grid grid-cols-3 gap-4">
-              {entitlements.map(entitlement => (
-                <EntitlementCard
-                  key={entitlement.id}
-                  entitlement={entitlement}
-                  onClick={setSelectedId}
-                />
-              ))}
+            <div ref={gridRef} className="py-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {items.map(({ product, entitlement }) =>
+                product.clientStatus === 'payg' ? (
+                  <PayAsYouGoCard key={product.slug} product={product} />
+                ) : entitlement ? (
+                  <EntitlementCard key={product.slug} entitlement={entitlement} onClick={() => setSelectedId(product.slug)} />
+                ) : (
+                  <InactiveCategoryCard key={product.slug} product={product} />
+                )
+              )}
             </div>
           )}
         </div>
