@@ -1,3 +1,4 @@
+import { ArrowRight } from 'lucide-react';
 import type { Entitlement } from '../../types/portalTypes';
 import { averageUsageRate } from './benefitStatus';
 
@@ -67,12 +68,18 @@ export function EntitlementsSummaryBanner({ entitlements, onClick }: Entitlement
   return (
     <button
       onClick={onClick}
-      className="w-full text-left bg-white rounded-xl border border-[#e5e7eb] p-5 mb-4 flex flex-wrap items-center gap-x-6 gap-y-4 cursor-pointer hover:border-[#cad5e2] transition-colors"
+      className="group cursor-pointer w-full text-left bg-white rounded-xl border border-[#e5e7eb] p-5 mb-4 flex flex-wrap items-center gap-x-6 gap-y-4 transition-colors hover:border-[#0a2333]/30 hover:bg-[#f9fafb] focus:outline-none focus-visible:border-[#0a2333] focus-visible:ring-2 focus-visible:ring-[#0a2333]/20"
     >
       <div className="shrink-0 pr-2">
-        <h2 className="font-['Cabin',sans-serif] font-bold text-[15px] text-[#0a2333]">
-          All Entitlements
-        </h2>
+        <div className="flex items-center gap-2">
+          <h2 className="font-['Cabin',sans-serif] font-bold text-[15px] text-[#0a2333]">
+            All Entitlements
+          </h2>
+          <ArrowRight
+            size={16}
+            className="shrink-0 text-[#9ca3af] transition-colors group-hover:text-[#0a2333]"
+          />
+        </div>
         <p className="font-['Cabin',sans-serif] font-normal text-[12px] text-[#6a7282] mt-0.5">
           Combined point pool across all entitlements
         </p>

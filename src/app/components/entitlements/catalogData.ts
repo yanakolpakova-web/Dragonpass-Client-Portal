@@ -130,6 +130,23 @@ export const CATALOG_PRODUCTS: Product[] = [
     unitCostGBP: 22.00,
   },
   {
+    slug: 'swappable',
+    name: 'Swappable Product',
+    icon: 'Shuffle',
+    shortDescription: 'Flexible benefit credits redeemable across different products',
+    fullDescription: 'Cross-category entitlement points configured under the Combine category in SaaS. A single point can be redeemed in any of the categories the membership template supports, rather than being tied to one product module. The supported range varies by membership template.',
+    benefits: [
+      { icon: 'Star', title: 'One Pool', description: 'A single balance customers can spend across several categories' },
+      { icon: 'Users', title: 'Per Template', description: 'Supported categories vary by membership template' },
+      { icon: 'TrendingUp', title: 'Counted Separately', description: 'Tracked as its own pool, not folded into category allocations' },
+    ],
+    integrationGuide: 'Redeem swappable points through the target category endpoint as normal. The balance is drawn from the Combine pool when the category is in the membership template\u2019s supported range.',
+    documentationUrl: 'https://docs.dragonpass.com/combine',
+    clientStatus: 'active',
+    swappableCategories: ['airport-lounge', 'fast-track', 'airport-dining'],
+    unitCostGBP: 20.00,
+  },
+  {
     slug: 'health-wellness',
     name: 'Health & Wellness',
     icon: 'Heart',

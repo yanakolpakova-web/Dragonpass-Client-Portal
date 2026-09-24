@@ -1,4 +1,4 @@
-import { ArrowLeft, ExternalLink, Plane, Building2, Sofa, Car, UtensilsCrossed, Zap, Smartphone, Ticket, Heart, Globe, DollarSign, Star, TrendingUp, Shield, MapPin, Clock, Users, CreditCard, Calendar } from 'lucide-react';
+import { ArrowLeft, ExternalLink, Plane, Building2, Sofa, Car, UtensilsCrossed, Zap, Smartphone, Ticket, Heart, Shuffle, Globe, DollarSign, Star, TrendingUp, Shield, MapPin, Clock, Users, CreditCard, Calendar } from 'lucide-react';
 import { CATALOG_PRODUCTS } from './catalogData';
 import type { Product } from '../../types/portalTypes';
 import { Badge } from '../shared/Badge';
@@ -6,7 +6,7 @@ import { Button } from '../shared/Button';
 import { IconBox } from '../shared/IconBox';
 
 const iconMap: Record<string, React.ElementType> = {
-  Plane, Building2, Sofa, Car, UtensilsCrossed, Zap, Smartphone, Ticket, Heart,
+  Plane, Building2, Sofa, Car, UtensilsCrossed, Zap, Smartphone, Ticket, Heart, Shuffle,
   Globe, DollarSign, Star, TrendingUp, Shield, MapPin, Clock, Users, CreditCard, Calendar,
 };
 

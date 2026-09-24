@@ -1,11 +1,11 @@
-import { Plane, Building2, Sofa, Car, UtensilsCrossed, Zap, Smartphone, Ticket, Heart } from 'lucide-react';
+import { Plane, Building2, Sofa, Car, UtensilsCrossed, Zap, Smartphone, Ticket, Heart, Shuffle, ArrowRight } from 'lucide-react';
 import type { Entitlement, Product } from '../../types/portalTypes';
 import { Badge } from '../shared/Badge';
 import { IconBox } from '../shared/IconBox';
 import { benefitStatus, usageRingColor } from './benefitStatus';
 
 const iconMap: Record<string, React.ElementType> = {
-  Plane, Building2, Sofa, Car, UtensilsCrossed, Zap, Smartphone, Ticket, Heart,
+  Plane, Building2, Sofa, Car, UtensilsCrossed, Zap, Smartphone, Ticket, Heart, Shuffle,
 };
 
 interface EntitlementCardProps {
@@ -94,9 +94,10 @@ export function EntitlementCard({ entitlement, onClick }: EntitlementCardProps) 
   const status = benefitStatus(entitlement);
 
   return (
-    <div
+    <button
+      type="button"
       onClick={() => onClick(entitlement.id)}
-      className="group cursor-pointer bg-white rounded-xl border border-[#e5e7eb] p-6 hover:border-[#0a2333]/20 hover:shadow-sm transition-all flex flex-col"
+      className="group cursor-pointer w-full text-left bg-white rounded-xl border border-[#e5e7eb] p-6 flex flex-col transition-colors hover:border-[#0a2333]/30 hover:bg-[#f9fafb] focus:outline-none focus-visible:border-[#0a2333] focus-visible:ring-2 focus-visible:ring-[#0a2333]/20"
     >
       <div className="flex items-start justify-between gap-3">
         <div className="flex items-center gap-3 min-w-0">
@@ -110,11 +111,15 @@ export function EntitlementCard({ entitlement, onClick }: EntitlementCardProps) 
               </h3>
               <Badge variant={status.variant}>{status.label}</Badge>
             </div>
-            <p className="font-['Cabin',sans-serif] text-[12px] text-[#6a7282] mt-0.5 truncate">
+            <p className="font-['Cabin',sans-serif] font-normal text-[12px] text-[#6a7282] mt-0.5 truncate">
               {entitlement.description}
             </p>
           </div>
         </div>
+        <ArrowRight
+          size={16}
+          className="shrink-0 mt-1 text-[#9ca3af] transition-colors group-hover:text-[#0a2333]"
+        />
       </div>
 
       <div className="flex items-center gap-4 pt-6">
@@ -123,7 +128,7 @@ export function EntitlementCard({ entitlement, onClick }: EntitlementCardProps) 
           <div className="font-['Cabin',sans-serif] font-bold text-[28px] leading-none text-[#0a2333] tracking-tight">
             {entitlement.used.toLocaleString()}
           </div>
-          <div className="font-['Cabin',sans-serif] text-[13px] text-[#6a7282] mt-2">
+          <div className="font-['Cabin',sans-serif] font-normal text-[13px] text-[#6a7282] mt-2">
             {hasCap ? (
               /* AC-12: "X of Y remaining", remaining value in bold. */
               <>
@@ -140,7 +145,7 @@ export function EntitlementCard({ entitlement, onClick }: EntitlementCardProps) 
         </div>
       </div>
 
-    </div>
+    </button>
   );
 }
 
@@ -165,7 +170,7 @@ function PlaceholderCard({
     <div
       onClick={onClick}
       className={`bg-white rounded-xl border border-[#e5e7eb] p-6 flex flex-col ${muted ? 'opacity-60' : ''} ${
-        onClick ? 'cursor-pointer hover:border-[#0a2333]/20 hover:shadow-sm transition-all' : ''
+        onClick ? 'cursor-pointer transition-colors hover:border-[#0a2333]/30 hover:bg-[#f9fafb]' : ''
       }`}
     >
       <div className="flex items-start justify-between gap-3">

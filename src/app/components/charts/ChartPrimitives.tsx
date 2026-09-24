@@ -72,7 +72,7 @@ interface UsageComboChartProps {
   xKey: string;
   dataKey: string;
   name?: string;
-  height?: number;
+  height?: number | string;
   barSize?: number;
   barColor?: string;
   lineColor?: string;

@@ -1,6 +1,78 @@
 import type { Entitlement } from '../../types/portalTypes';
 
+// A client can hold several membership templates, and the categories a
+// swappable point covers vary between them.
+export interface SwappableMembership {
+  code: string;
+  entitlements: number;
+  eligible: string[];
+}
+
+export const SWAPPABLE_MEMBERSHIPS: Record<'test' | 'production', SwappableMembership[]> = {
+  // Test carries a template covering every Dragonpass category, to show how a
+  // full eligible list behaves in the table.
+  test: [
+    {
+      code: 'MBR-100244',
+      entitlements: 12,
+      eligible: [
+        'airport-lounge', 'fast-track', 'airport-dining', 'airport-transfer',
+        'flights', 'hotels', 'esims', 'tickets', 'health-wellness',
+      ],
+    },
+    { code: 'MBR-100871', entitlements: 4, eligible: ['airport-lounge', 'fast-track'] },
+    { code: 'MBR-101396', entitlements: 6, eligible: ['airport-dining', 'esims', 'tickets'] },
+  ],
+  production: [
+    { code: 'MBR-004821', entitlements: 5, eligible: ['airport-lounge', 'airport-dining', 'fast-track'] },
+    { code: 'MBR-007163', entitlements: 3, eligible: ['airport-lounge', 'airport-dining'] },
+    { code: 'MBR-012094', entitlements: 8, eligible: ['airport-dining', 'fast-track'] },
+  ],
+};
+
 export const MOCK_ENTITLEMENTS: Entitlement[] = [
+  {
+    id: 'ent-swap-test',
+    productSlug: 'swappable',
+    productName: 'Swappable Product',
+    productIcon: 'Shuffle',
+    description: 'Flexible benefit credits redeemable across different products',
+    environment: 'test',
+    benefitType: 'entitlement',
+    unitCostGBP: 20.00,
+    allocation: 2500,
+    used: 900,
+    remaining: 1600,
+    cap: 2500,
+    status: 'active',
+    alertThresholds: { enabled: false, thresholds: [80, 90], recipients: [] },
+    lastAlertedThreshold: null,
+    startDate: '2026-01-15',
+    endDate: '2026-12-31',
+    createdAt: '2026-01-15',
+    updatedAt: '2026-09-18',
+  },
+  {
+    id: 'ent-swap-prod',
+    productSlug: 'swappable',
+    productName: 'Swappable Product',
+    productIcon: 'Shuffle',
+    description: 'Flexible benefit credits redeemable across different products',
+    environment: 'production',
+    benefitType: 'entitlement',
+    unitCostGBP: 20.00,
+    allocation: 6000,
+    used: 2400,
+    remaining: 3600,
+    cap: 6000,
+    status: 'active',
+    alertThresholds: { enabled: true, thresholds: [80, 90], recipients: ['admin@example.com'] },
+    lastAlertedThreshold: null,
+    startDate: '2026-01-15',
+    endDate: '2026-12-31',
+    createdAt: '2026-01-15',
+    updatedAt: '2026-09-18',
+  },
   {
     id: 'ent-1',
     productSlug: 'esims',

@@ -1,8 +1,8 @@
-import { Plane, Building2, Sofa, Car, UtensilsCrossed, Zap, Smartphone, Ticket, Heart, ChevronRight } from 'lucide-react';
+import { Plane, Building2, Sofa, Car, UtensilsCrossed, Zap, Smartphone, Ticket, Heart, Shuffle, ChevronRight } from 'lucide-react';
 import type { Product } from '../../types/portalTypes';
 
 const iconMap: Record<string, React.ElementType> = {
-  Plane, Building2, Sofa, Car, UtensilsCrossed, Zap, Smartphone, Ticket, Heart,
+  Plane, Building2, Sofa, Car, UtensilsCrossed, Zap, Smartphone, Ticket, Heart, Shuffle,
 };
 
 const statusStyles: Record<string, string> = {

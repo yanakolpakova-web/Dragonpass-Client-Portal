@@ -1,10 +1,10 @@
 import { useState } from 'react';
-import { Plane, Building2, Sofa, Car, UtensilsCrossed, Zap, Smartphone, Ticket, Heart, Calendar, Check, ChevronRight, ArrowLeft } from 'lucide-react';
+import { Plane, Building2, Sofa, Car, UtensilsCrossed, Zap, Smartphone, Ticket, Heart, Shuffle, Calendar, Check, ChevronRight, ArrowLeft } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '../ui/dialog';
 import { CATALOG_PRODUCTS } from './catalogData';
 
 const iconMap: Record<string, React.ElementType> = {
-  Plane, Building2, Sofa, Car, UtensilsCrossed, Zap, Smartphone, Ticket, Heart,
+  Plane, Building2, Sofa, Car, UtensilsCrossed, Zap, Smartphone, Ticket, Heart, Shuffle,
 };
 
 function formatGBP(amount: number) {

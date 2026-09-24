@@ -3,7 +3,7 @@
 // series (last 14 days), per-order activity (reference, date, customer, order ref,
 // status). Any field not available needs to be hidden or replaced before Q2 ship.
 import { useState, useEffect, useRef } from 'react';
-import { ArrowLeft, Plane, Building2, Sofa, Car, UtensilsCrossed, Zap, Smartphone, Ticket, Heart, Layers, AlertTriangle, ChevronRight, SlidersHorizontal, ChevronDown, Check, CalendarDays, Plus, Mail, X, Download } from 'lucide-react';
+import { ArrowLeft, Plane, Building2, Sofa, Car, UtensilsCrossed, Zap, Smartphone, Ticket, Heart, Shuffle, Layers, AlertTriangle, ChevronRight, SlidersHorizontal, ChevronDown, Check, CalendarDays, Plus, X, Download } from 'lucide-react';
 import type { Entitlement } from '../../types/portalTypes';
 import { Badge } from '../shared/Badge';
 import { IconBox } from '../shared/IconBox';
@@ -13,12 +13,13 @@ import { Button } from '../shared/Button';
 import { OrderDetailPanel } from '../orders/OrderDetailPanel';
 import type { Order } from '../orders/orderData';
 import { CATALOG_PRODUCTS } from './catalogData';
+import { SWAPPABLE_MEMBERSHIPS } from './mockEntitlements';
 import { UsageComboChart } from '../charts/ChartPrimitives';
 import { benefitStatus } from './benefitStatus';
 import { useApp } from '../../store';
 
 const iconMap: Record<string, React.ElementType> = {
-  Plane, Building2, Sofa, Car, UtensilsCrossed, Zap, Smartphone, Ticket, Heart, Layers,
+  Plane, Building2, Sofa, Car, UtensilsCrossed, Zap, Smartphone, Ticket, Heart, Shuffle, Layers,
 };
 
 function ThresholdInput({ value, onChange }: { value: number; onChange: (v: number) => void }) {
@@ -238,7 +239,15 @@ const ACTIVITY_ROWS = [
   { orderId: 'ORD-2026-0041', customer: 'R. Singh', status: 'Used' as const, created: daysAgo(12, 19, 15), redeemed: daysAgo(12, 20, 40) },
 ];
 
-function makeOrder(row: typeof ACTIVITY_ROWS[number], productName: string): Order {
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+const productIcon = (slug: string): React.ElementType =>
+  iconMap[CATALOG_PRODUCTS.find(p => p.slug === slug)?.icon ?? ''] ?? Smartphone;
+
+const productName = (slug: string) =>
+  CATALOG_PRODUCTS.find(p => p.slug === slug)?.name ?? slug;
+
+function makeOrder(row: typeof ACTIVITY_ROWS[number], moduleName: string): Order {
   return {
     id: row.orderId,
     orderRef: row.orderId,
@@ -258,7 +267,7 @@ function makeOrder(row: typeof ACTIVITY_ROWS[number], productName: string): Orde
     basePrice: 15,
     taxesFees: 3,
     paymentMethod: 'Entitlement',
-    serviceDescription: productName,
+    serviceDescription: moduleName,
   };
 }
 
@@ -271,9 +280,14 @@ interface EntitlementDetailPageProps {
   activeView: string;
   onNavigate: (id: string) => void;
   onBack: () => void;
+  /** Swappable (Combine) benefit: slugs of the categories its points cover. */
+  swappableCategories?: string[];
+  /** Slugs to spread across the activity rows, where a single benefit name
+      would be wrong: a swappable pool, or the all-benefits aggregate. */
+  activityModules?: string[];
 }
 
-export function EntitlementDetailPage({ entitlement, categoryState, usageRate, activeView, onNavigate, onBack }: EntitlementDetailPageProps) {
+export function EntitlementDetailPage({ entitlement, categoryState, usageRate, activeView, onNavigate, onBack, swappableCategories, activityModules }: EntitlementDetailPageProps) {
   const { dispatch } = useApp();
   const isPayg = categoryState === 'payg';
   // No pool of points behind this category, so there are no figures to show.
@@ -291,6 +305,7 @@ export function EntitlementDetailPage({ entitlement, categoryState, usageRate, a
   const [dailyThreshold, setDailyThreshold] = useState('');
   const [recipients, setRecipients] = useState<string[]>(entitlement.alertThresholds.recipients);
   const [newRecipient, setNewRecipient] = useState('');
+  const [recipientError, setRecipientError] = useState('');
   const [chartRange, setChartRange] = useState<ChartRange>(7);
   const [chartFrom, setChartFrom] = useState('');
   const [chartTo, setChartTo] = useState('');
@@ -301,6 +316,7 @@ export function EntitlementDetailPage({ entitlement, categoryState, usageRate, a
   const [activePeriod, setActivePeriod] = useState<'today' | 'last7' | 'custom' | 'all'>('all');
   const [statusFilter, setStatusFilter] = useState('all');
   const [customerFilter, setCustomerFilter] = useState('all');
+  const [categoryFilter, setCategoryFilter] = useState('all');
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const Icon = iconMap[entitlement.productIcon] || Smartphone;
   const pct = usageRate ?? (hasCap && capValue > 0 ? Math.min(100, (entitlement.used / capValue) * 100) : 0);
@@ -316,10 +332,33 @@ export function EntitlementDetailPage({ entitlement, categoryState, usageRate, a
   const avgPerDay = Math.round(usageSeries.reduce((sum, d) => sum + d.usage, 0) / usageSeries.length);
 
   const addRecipient = () => {
-    const email = newRecipient.trim();
-    if (!email || recipients.includes(email)) return;
-    setRecipients([...recipients, email]);
-    setNewRecipient('');
+    // Pasting a comma-separated list is common, so each address becomes its
+    // own chip. Whatever is valid and new gets added; the rest is reported
+    // rather than silently dropped.
+    const entries = newRecipient.split(',').map(e => e.trim()).filter(Boolean);
+    if (!entries.length) return;
+
+    const seen = new Set<string>();
+    const valid: string[] = [];
+    const invalid: string[] = [];
+    const duplicate: string[] = [];
+
+    entries.forEach(e => {
+      if (!EMAIL_RE.test(e)) invalid.push(e);
+      else if (recipients.includes(e) || seen.has(e)) duplicate.push(e);
+      else { seen.add(e); valid.push(e); }
+    });
+
+    if (valid.length) setRecipients([...recipients, ...valid]);
+
+    const problems = [];
+    if (invalid.length) problems.push(`Not a valid email address: ${invalid.join(', ')}.`);
+    if (duplicate.length) problems.push(`Already added: ${duplicate.join(', ')}.`);
+    setRecipientError(problems.join(' '));
+
+    // Keep the malformed ones in the field so they can be corrected; a
+    // duplicate is nothing to fix, so it is only reported.
+    setNewRecipient(invalid.join(', '));
   };
 
   const UNLIMITED = 'Unlimited';
@@ -343,30 +382,54 @@ export function EntitlementDetailPage({ entitlement, categoryState, usageRate, a
     return true;
   };
 
+  const isSwappable = Boolean(swappableCategories?.length);
+  const memberships = SWAPPABLE_MEMBERSHIPS[entitlement.environment] ?? [];
+  // "Eligible across all templates" is exactly that: the union of what the
+  // templates cover, so it tracks the environment's data.
+  const eligibleUnion = [...new Set(memberships.flatMap(m => m.eligible))];
+  const moduleSlugs = isSwappable ? eligibleUnion : activityModules;
+
+  // A swappable point is spent in one of the supported categories, so each row
+  // reports where it landed rather than the benefit it was drawn from.
+  const activityRows = ACTIVITY_ROWS.map((r, i) => {
+    const slug = moduleSlugs?.length
+      ? moduleSlugs[i % moduleSlugs.length]
+      : entitlement.productSlug;
+    return {
+      ...r,
+      moduleSlug: slug,
+      module: moduleSlugs?.length ? productName(slug) : entitlement.productName,
+    };
+  });
+
   const q = activitySearch.trim().toLowerCase();
   // AC-27: a pay-as-you-go category has no redemption history to list.
-  const filtered = (noPool ? [] : ACTIVITY_ROWS).filter(r =>
+  const filtered = (noPool ? [] : activityRows).filter(r =>
     (!q || r.orderId.toLowerCase().includes(q) || r.customer.toLowerCase().includes(q)) &&
     (statusFilter === 'all' || r.status === statusFilter) &&
     (customerFilter === 'all' || r.customer === customerFilter) &&
+    (categoryFilter === 'all' || r.module === categoryFilter) &&
     inPeriod(r.created)
   );
 
   const countInPeriod = (period: 'today' | 'last7') =>
-    ACTIVITY_ROWS.filter(r => {
+    activityRows.filter(r => {
       if (period === 'today') return r.created.toDateString() === new Date().toDateString();
       const cutoff = new Date();
       cutoff.setDate(cutoff.getDate() - 7);
       return r.created >= cutoff;
     }).length;
 
-  const customers = [...new Set(ACTIVITY_ROWS.map(r => r.customer))];
-  const hasHistory = !noPool && ACTIVITY_ROWS.length > 0;
+  const customers = [...new Set(activityRows.map(r => r.customer))];
+  // Only a swappable benefit spans more than one category, so the filter is
+  // only offered where there is something to choose between.
+  const categories = [...new Set(activityRows.map(r => r.module))];
+  const hasHistory = !noPool && activityRows.length > 0;
 
   const exportCsv = () => {
     const header = ['Order ID', 'Benefit Module', 'Customer', 'Status', 'Created Time', 'Redemption Time'];
     const body = filtered.map(r => [
-      r.orderId, entitlement.productName, r.customer, r.status, formatMoment(r.created), formatMoment(r.redeemed),
+      r.orderId, r.module, r.customer, r.status, formatMoment(r.created), formatMoment(r.redeemed),
     ]);
     const csv = [header, ...body]
       .map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(','))
@@ -379,14 +442,33 @@ export function EntitlementDetailPage({ entitlement, categoryState, usageRate, a
     URL.revokeObjectURL(url);
     dispatch({ type: 'SET_TOAST', payload: { message: `Exported ${filtered.length} transactions`, type: 'success' } });
   };
-  const hasActiveFilters = Boolean(q) || statusFilter !== 'all' || customerFilter !== 'all' || activePeriod !== 'all';
+  const exportMemberships = () => {
+    const header = ['Membership Code', 'Swappable Entitlements', 'Eligible Products'];
+    const body = memberships.map(m => [
+      m.code,
+      String(m.entitlements),
+      m.eligible.map(productName).join('; '),
+    ]);
+    const csv = [header, ...body]
+      .map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(','))
+      .join('\n');
+    const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8;' }));
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'swappable-products-detail.csv';
+    a.click();
+    URL.revokeObjectURL(url);
+    dispatch({ type: 'SET_TOAST', payload: { message: `Exported ${memberships.length} membership templates`, type: 'success' } });
+  };
+
+  const hasActiveFilters = Boolean(q) || statusFilter !== 'all' || customerFilter !== 'all' || categoryFilter !== 'all' || activePeriod !== 'all';
 
   return (
     <PageShell activeView={activeView} onNavigate={onNavigate}>
       <div className="flex flex-col flex-1 overflow-auto w-full max-w-[1440px] mx-auto">
 
         {/* Header — scrolls with the page */}
-        <div className="px-8 pt-5 pb-4 border-b border-[#e5e7eb] shrink-0">
+        <div className="px-4 sm:px-8 pt-5 pb-4 border-b border-[#e5e7eb] shrink-0">
           <button
             onClick={onBack}
             className="cursor-pointer inline-flex items-center gap-1.5 font-['Cabin',sans-serif] text-[12px] text-[#6a7282] hover:text-[#0a2333] transition-colors mb-3"
@@ -395,8 +477,11 @@ export function EntitlementDetailPage({ entitlement, categoryState, usageRate, a
             Back to Benefits
           </button>
 
-          <div className="flex items-center gap-4">
-            <IconBox>
+          {/* Top-aligned: the eligible-categories list can wrap to several rows,
+              and centring would drag the icon down past the title. The offset
+              keeps a two-line header looking exactly as it did. */}
+          <div className="flex items-start gap-4">
+            <IconBox className="mt-[7px]">
               <Icon size={20} className="text-[#0a2333]" />
             </IconBox>
             <div>
@@ -406,7 +491,31 @@ export function EntitlementDetailPage({ entitlement, categoryState, usageRate, a
                   {isPayg ? 'Pay as you go' : categoryState === 'inactive' ? 'Inactive' : status.label}
                 </Badge>
               </div>
-              <p className="font-['Cabin',sans-serif] text-[13px] text-[#6a7282] mt-0.5">{entitlement.description}</p>
+              {/* On a swappable benefit the eligible list takes the description's
+                  place — the description only restated it. The list is the union
+                  across membership templates; no single template need cover all
+                  of them, hence the label. */}
+              {isSwappable ? (
+                <div className="flex items-center flex-wrap gap-1.5 mt-0.5">
+                  <span className="font-['Cabin',sans-serif] text-[13px] text-[#6a7282]">
+                    Eligible across all templates:
+                  </span>
+                  {eligibleUnion.map(slug => {
+                    const CategoryIcon = productIcon(slug);
+                    return (
+                      <span
+                        key={slug}
+                        className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-[#f3f4f6] font-['Cabin',sans-serif] text-[12px] text-[#374151]"
+                      >
+                        <CategoryIcon size={12} className="shrink-0 text-[#45556c]" />
+                        {productName(slug)}
+                      </span>
+                    );
+                  })}
+                </div>
+              ) : (
+                <p className="font-['Cabin',sans-serif] text-[13px] text-[#6a7282] mt-0.5">{entitlement.description}</p>
+              )}
             </div>
           </div>
         </div>
@@ -415,8 +524,8 @@ export function EntitlementDetailPage({ entitlement, categoryState, usageRate, a
         <div>
 
           {/* KPI Cards */}
-          <div className="px-8 py-5">
-            <div className="grid grid-cols-4 gap-4">
+          <div className="px-4 sm:px-8 py-5">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               {/* Allocation */}
               <div className="bg-white rounded-xl border border-[#e2e8f0] p-4 flex flex-col gap-1">
                 <span className="font-['Cabin',sans-serif] text-[13px] text-[#62748e]">Allocation</span>
@@ -460,13 +569,13 @@ export function EntitlementDetailPage({ entitlement, categoryState, usageRate, a
           </div>
 
           {/* Cap Configuration + Usage Chart side by side */}
-          <div className="px-8 py-2">
-            <div className="grid grid-cols-2 gap-4">
+          <div className="px-4 sm:px-8 py-2">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:h-[482px]">
               {/* Usage Alerts */}
-              <div>
+              <div className="flex flex-col lg:min-h-0">
                 <h3 className="font-['Cabin',sans-serif] font-bold text-[15px] text-[#0a2333] mb-3">Usage alerts</h3>
-                <div className="bg-white rounded-xl border border-[#e5e7eb] p-5">
-                  <div className="space-y-4">
+                <div className="bg-white rounded-xl border border-[#e5e7eb] p-5 flex flex-col lg:flex-1 lg:min-h-0">
+                  <div className="space-y-4 flex flex-col lg:flex-1 lg:min-h-0">
                     {noPool ? (
                       <p className="font-['Cabin',sans-serif] text-[13px] text-[#6a7282]">
                         {isPayg
@@ -475,34 +584,38 @@ export function EntitlementDetailPage({ entitlement, categoryState, usageRate, a
                       </p>
                     ) : hasCap ? (
                       <>
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <div className="flex items-center gap-1 font-['Cabin',sans-serif] text-[13px] text-[#0a2333]">
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-x-1 gap-y-1.5 font-['Cabin',sans-serif] text-[13px] text-[#0a2333]">
                           Alert at
                           <ThresholdInput value={threshold1} onChange={setThreshold1} />
                           % usage
                         </div>
                         <div className="font-['Cabin',sans-serif] text-[12px] text-[#6a7282]">Get notified before approaching your limit</div>
                       </div>
-                      <ToggleSwitch checked={alert80} onChange={(v) => {
-                        setAlert80(v);
-                        dispatch({ type: 'SET_TOAST', payload: { message: v ? `${threshold1}% alert enabled` : `${threshold1}% alert disabled`, type: 'success' } });
-                      }} />
+                      <div className="shrink-0">
+                        <ToggleSwitch checked={alert80} onChange={(v) => {
+                          setAlert80(v);
+                          dispatch({ type: 'SET_TOAST', payload: { message: v ? `${threshold1}% alert enabled` : `${threshold1}% alert disabled`, type: 'success' } });
+                        }} />
+                      </div>
                     </div>
 
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <div className="flex items-center gap-1 font-['Cabin',sans-serif] text-[13px] text-[#0a2333]">
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-x-1 gap-y-1.5 font-['Cabin',sans-serif] text-[13px] text-[#0a2333]">
                           Alert at
                           <ThresholdInput value={threshold2} onChange={setThreshold2} />
                           % usage
                         </div>
                         <div className="font-['Cabin',sans-serif] text-[12px] text-[#6a7282]">Final warning before hitting your cap</div>
                       </div>
-                      <ToggleSwitch checked={alert90} onChange={(v) => {
-                        setAlert90(v);
-                        dispatch({ type: 'SET_TOAST', payload: { message: v ? `${threshold2}% alert enabled` : `${threshold2}% alert disabled`, type: 'success' } });
-                      }} />
+                      <div className="shrink-0">
+                        <ToggleSwitch checked={alert90} onChange={(v) => {
+                          setAlert90(v);
+                          dispatch({ type: 'SET_TOAST', payload: { message: v ? `${threshold2}% alert enabled` : `${threshold2}% alert disabled`, type: 'success' } });
+                        }} />
+                      </div>
                     </div>
                       </>
                     ) : (
@@ -549,40 +662,54 @@ export function EntitlementDetailPage({ entitlement, categoryState, usageRate, a
                     )}
 
                     {!noPool && (
-                    <div className="flex flex-col gap-2">
+                    <div className="flex flex-col gap-2 lg:flex-1 lg:min-h-0">
                       <label className="font-['Cabin',sans-serif] text-[13px] text-[#6a7282]">Alert recipients</label>
 
                       <div className="flex items-center gap-2">
                         <input
                           type="email"
                           value={newRecipient}
-                          onChange={e => setNewRecipient(e.target.value)}
+                          onChange={e => { setNewRecipient(e.target.value); setRecipientError(''); }}
+                          aria-invalid={Boolean(recipientError)}
+                          aria-describedby="recipient-hint"
                           onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addRecipient(); } }}
-                          placeholder="name@company.com"
-                          className="flex-1 h-9 px-3 rounded-lg border border-[#e5e7eb] text-[13px] font-['Cabin',sans-serif] text-[#0a2333] placeholder:text-[#9ca3af] focus:outline-none focus:border-[#0a2333] bg-[#f9fafb]"
+                          placeholder="name@company.com, another@company.com"
+                          className={`flex-1 min-w-0 h-9 px-3 rounded-lg border text-[13px] font-['Cabin',sans-serif] text-[#0a2333] placeholder:text-[#9ca3af] focus:outline-none bg-[#f9fafb] ${
+                            recipientError ? 'border-[#dc2626] focus:border-[#dc2626]' : 'border-[#e5e7eb] focus:border-[#0a2333]'
+                          }`}
                         />
                         <button
                           onClick={addRecipient}
-                          className="cursor-pointer shrink-0 flex items-center gap-1 h-9 px-3 rounded-lg border border-[#e5e7eb] font-['Cabin',sans-serif] text-[13px] text-[#45556c] hover:bg-[#f9fafb] transition-colors"
+                          disabled={!newRecipient.trim()}
+                          className="cursor-pointer shrink-0 flex items-center gap-1 h-9 px-3 rounded-lg border border-[#e5e7eb] font-['Cabin',sans-serif] text-[13px] text-[#45556c] hover:bg-[#f9fafb] transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white"
                         >
                           <Plus size={14} />
                           Add
                         </button>
                       </div>
 
-                      {recipients.map(r => (
-                        <div key={r} className="flex items-center gap-2 h-9 px-3 rounded-lg border border-[#e5e7eb] bg-[#f9fafb]">
-                          <Mail size={14} className="shrink-0 text-[#9ca3af]" />
-                          <span className="flex-1 truncate font-['Cabin',sans-serif] text-[13px] text-[#0a2333]">{r}</span>
-                          <button
-                            onClick={() => setRecipients(recipients.filter(x => x !== r))}
-                            aria-label={`Remove ${r}`}
-                            className="cursor-pointer shrink-0 text-[#9ca3af] hover:text-[#0a2333] transition-colors"
-                          >
-                            <X size={14} />
-                          </button>
-                        </div>
-                      ))}
+                      <p
+                        id="recipient-hint"
+                        role={recipientError ? 'alert' : undefined}
+                        className={`font-['Cabin',sans-serif] text-[12px] ${recipientError ? 'text-[#dc2626]' : 'text-[#9ca3af]'}`}
+                      >
+                        {recipientError || 'Separate multiple addresses with commas'}
+                      </p>
+
+                      <div className="flex flex-wrap content-start gap-1.5 lg:flex-1 lg:min-h-0 lg:overflow-y-auto">
+                        {recipients.map(r => (
+                          <span key={r} className="inline-flex items-center gap-1 max-w-full h-7 pl-2.5 pr-1 rounded-full border border-[#e5e7eb] bg-[#f9fafb]">
+                            <span className="truncate font-['Cabin',sans-serif] text-[12px] text-[#0a2333]">{r}</span>
+                            <button
+                              onClick={() => setRecipients(recipients.filter(x => x !== r))}
+                              aria-label={`Remove ${r}`}
+                              className="cursor-pointer shrink-0 w-5 h-5 flex items-center justify-center rounded-full text-[#9ca3af] hover:text-[#0a2333] hover:bg-[#e5e7eb] transition-colors"
+                            >
+                              <X size={12} />
+                            </button>
+                          </span>
+                        ))}
+                      </div>
 
                       <div className="flex justify-end pt-1">
                         <button
@@ -599,9 +726,9 @@ export function EntitlementDetailPage({ entitlement, categoryState, usageRate, a
               </div>
 
               {/* Daily Usage Chart */}
-              <div>
+              <div className="flex flex-col lg:min-h-0">
                 <h3 className="font-['Cabin',sans-serif] font-bold text-[15px] text-[#0a2333] mb-3">Daily usage</h3>
-                <div className="bg-white rounded-xl border border-[#e5e7eb] p-5 h-[calc(100%-36px)]">
+                <div className="bg-white rounded-xl border border-[#e5e7eb] p-5 flex flex-col lg:flex-1 lg:min-h-0">
                   <div className="flex items-center justify-between gap-2 mb-3 flex-wrap">
                     {/* AC-25: range selector */}
                     <RangeDropdown
@@ -619,28 +746,87 @@ export function EntitlementDetailPage({ entitlement, categoryState, usageRate, a
                     />
                     <span className="font-['Cabin',sans-serif] text-[12px] text-[#62748e]">Avg: {avgPerDay}/day</span>
                   </div>
-                  <UsageComboChart
-                    data={usageSeries}
-                    xKey="label"
-                    dataKey="usage"
-                    height={230}
-                    barSize={chartDays > 30 ? 4 : chartDays > 7 ? 8 : 16}
-                    labelFormatter={(label) => usageSeries.find(d => d.label === label)?.full ?? String(label)}
-                  />
+                  <div className="h-[230px] lg:h-auto lg:flex-1 lg:min-h-0">
+                    <UsageComboChart
+                      data={usageSeries}
+                      xKey="label"
+                      dataKey="usage"
+                      height="100%"
+                      barSize={chartDays > 30 ? 4 : chartDays > 7 ? 8 : 16}
+                      labelFormatter={(label) => usageSeries.find(d => d.label === label)?.full ?? String(label)}
+                    />
+                  </div>
                 </div>
               </div>  {/* close chart column */}
             </div>  {/* close grid */}
           </div>  {/* close px-8 py-2 */}
 
+          {/* Swappable (Combine) benefit: which categories each membership
+              template can spend its points in. */}
+          {isSwappable && (
+            <>
+              <div className="px-4 sm:px-8 pt-5 pb-3 flex items-center justify-between gap-3">
+                <h3 className="font-['Cabin',sans-serif] font-bold text-[15px] text-[#0a2333]">
+                  Swappable Products Detail
+                </h3>
+                <Button variant="ghost" onClick={exportMemberships}>
+                  <Download size={13} />
+                  Export
+                </Button>
+              </div>
+
+              <div className="px-4 sm:px-8 pb-2">
+                <div className="bg-white rounded-xl border border-[#e5e7eb] overflow-hidden">
+                <div className="overflow-x-auto">
+                <div className="min-w-[600px]">
+                <div className="border-b border-[#e5e7eb] bg-[#f9fafb]">
+                  <div className="flex items-center px-4 py-3">
+                    <div className="w-[24%] shrink-0"><span className="font-['Cabin',sans-serif] font-semibold text-[11px] text-[#6a7282] uppercase tracking-wider">Membership Code</span></div>
+                    <div className="w-[26%] shrink-0"><span className="font-['Cabin',sans-serif] font-semibold text-[11px] text-[#6a7282] uppercase tracking-wider">Swappable Entitlements</span></div>
+                    <div className="flex-1"><span className="font-['Cabin',sans-serif] font-semibold text-[11px] text-[#6a7282] uppercase tracking-wider">Eligible Products</span></div>
+                  </div>
+                </div>
+
+                {memberships.map(m => (
+                  <div key={m.code} className="flex items-center px-4 py-3.5 border-b border-[#e5e7eb] last:border-b-0">
+                    <div className="w-[24%] shrink-0">
+                      <span className="font-['Cabin',sans-serif] font-semibold text-[13px] text-[#0a2333]">{m.code}</span>
+                    </div>
+                    <div className="w-[26%] shrink-0">
+                      <span className="font-['Cabin',sans-serif] text-[13px] text-[#0a2333] tabular-nums">{m.entitlements}</span>
+                    </div>
+                    <div className="flex-1 flex flex-wrap gap-1.5">
+                      {m.eligible.map(slug => {
+                        const CategoryIcon = productIcon(slug);
+                        return (
+                          <span
+                            key={slug}
+                            className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-[#f3f4f6] font-['Cabin',sans-serif] text-[12px] text-[#374151]"
+                          >
+                            <CategoryIcon size={12} className="shrink-0 text-[#45556c]" />
+                            {productName(slug)}
+                          </span>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))}
+                </div>
+                </div>
+                </div>
+              </div>
+            </>
+          )}
+
           {/* Recent Activity */}
-          <div className="px-8 pt-5 pb-3">
+          <div className="px-4 sm:px-8 pt-5 pb-3">
             <h3 className="font-['Cabin',sans-serif] font-bold text-[15px] text-[#0a2333] mb-3">Recent activity</h3>
-            <div className="flex items-center gap-3">
+            <div className="flex flex-wrap items-center gap-3">
               <SearchInput
                 value={activitySearch}
                 onChange={setActivitySearch}
                 placeholder="Search order ID, customers..."
-                className="flex-1 max-w-[400px]"
+                className="flex-1 min-w-[180px] max-w-[400px]"
               />
               <Button variant="ghost" onClick={() => setShowFilters(v => !v)}>
                 <SlidersHorizontal size={13} />
@@ -654,6 +840,7 @@ export function EntitlementDetailPage({ entitlement, categoryState, usageRate, a
                     setActivitySearch('');
                     setStatusFilter('all');
                     setCustomerFilter('all');
+                    setCategoryFilter('all');
                     setActivePeriod('all');
                     setFilterFrom('');
                     setFilterTo('');
@@ -662,7 +849,7 @@ export function EntitlementDetailPage({ entitlement, categoryState, usageRate, a
                   Clear all
                 </Button>
               )}
-              <div className="flex-1" />
+              <div className="hidden lg:block flex-1" />
               <RangeDropdown
                 value={activePeriod}
                 onChange={v => setActivePeriod(v as 'today' | 'last7' | 'custom' | 'all')}
@@ -688,7 +875,7 @@ export function EntitlementDetailPage({ entitlement, categoryState, usageRate, a
             </div>
 
             {showFilters && (
-              <div className="flex items-center gap-2 mt-3">
+              <div className="flex flex-wrap items-center gap-2 mt-3">
                 <FilterDropdown
                   label="Status"
                   value={statusFilter}
@@ -701,12 +888,22 @@ export function EntitlementDetailPage({ entitlement, categoryState, usageRate, a
                   options={customers}
                   onChange={setCustomerFilter}
                 />
+                {categories.length > 1 && (
+                  <FilterDropdown
+                    label="Category"
+                    value={categoryFilter}
+                    options={categories}
+                    onChange={setCategoryFilter}
+                  />
+                )}
               </div>
             )}
           </div>
 
-          <div className="px-8 pb-6">
+          <div className="px-4 sm:px-8 pb-6">
             <div className="bg-white rounded-xl border border-[#e5e7eb] overflow-hidden">
+              <div className="overflow-x-auto">
+              <div className="min-w-[860px]">
               <div className="border-b border-[#e5e7eb] bg-[#f9fafb]">
                 <div className="flex items-center px-4 py-3">
                   <div className="w-[18%] shrink-0"><span className="font-['Cabin',sans-serif] font-semibold text-[11px] text-[#6a7282] uppercase tracking-wider">Order ID</span></div>
@@ -724,17 +921,20 @@ export function EntitlementDetailPage({ entitlement, categoryState, usageRate, a
                   {hasHistory ? 'No activity matches your filters.' : 'No data available'}
                 </div>
               ) : (
-                filtered.map((row, i) => (
+                filtered.map((row, i) => {
+                  const ModuleIcon = productIcon(row.moduleSlug);
+                  return (
                   <div
                     key={i}
                     className="flex items-center px-4 py-3.5 border-b border-[#e5e7eb] hover:bg-[#f9fafb] transition-colors cursor-pointer group"
-                    onClick={() => setSelectedOrder(makeOrder(row, entitlement.productName))}
+                    onClick={() => setSelectedOrder(makeOrder(row, row.module))}
                   >
                     <div className="w-[18%] shrink-0">
                       <div className="font-['Cabin',sans-serif] font-semibold text-[13px] text-[#0a2333]">{row.orderId}</div>
                     </div>
-                    <div className="w-[18%] shrink-0">
-                      <span className="font-['Cabin',sans-serif] text-[13px] text-[#0a2333]">{entitlement.productName}</span>
+                    <div className="w-[18%] shrink-0 flex items-center gap-2">
+                      <ModuleIcon size={14} className="shrink-0 text-[#45556c]" />
+                      <span className="font-['Cabin',sans-serif] text-[13px] text-[#0a2333] truncate">{row.module}</span>
                     </div>
                     <div className="w-[16%] shrink-0">
                       <span className="font-['Cabin',sans-serif] text-[13px] text-[#0a2333]">{row.customer}</span>
@@ -754,8 +954,11 @@ export function EntitlementDetailPage({ entitlement, categoryState, usageRate, a
                       <ChevronRight size={16} className="text-[#9ca3af] group-hover:text-[#45556c] transition-colors" />
                     </div>
                   </div>
-                ))
+                  );
+                })
               )}
+              </div>
+              </div>
             </div>
             <div className="mt-3">
               <span className="font-['Cabin',sans-serif] text-[12px] text-[#9ca3af]">

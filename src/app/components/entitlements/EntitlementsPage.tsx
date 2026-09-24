@@ -187,6 +187,12 @@ export function EntitlementsPage({ activeView, onNavigate }: EntitlementsPagePro
         entitlement={selectedEntitlement}
         categoryState={selectedCategoryState}
         usageRate={selectedId === ALL_BENEFITS_ID ? averageUsageRate(environmentEntitlements) : undefined}
+        swappableCategories={selectedProduct?.swappableCategories}
+        activityModules={
+          selectedId === ALL_BENEFITS_ID
+            ? environmentEntitlements.map(e => e.productSlug)
+            : selectedProduct?.swappableCategories
+        }
         activeView={activeView}
         onNavigate={onNavigate}
         onBack={() => setSelectedId(null)}

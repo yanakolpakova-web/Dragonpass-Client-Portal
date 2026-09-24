@@ -62,6 +62,8 @@ export interface Product {
   integrationGuide: string;
   documentationUrl: string;
   clientStatus: 'active' | 'available' | 'requested' | 'payg';
+  // Combine category: points that can be spent in any of these categories.
+  swappableCategories?: string[];
   unitCostGBP: number;
 }
 
