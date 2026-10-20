@@ -3,6 +3,10 @@
 > Working notes from the build against `PRD-benefits-module.md` (Confluence export,
 > 15 Sep 2026 12:15 revision, 29 ACs). Records what was built, the decisions the PRD
 > left open, and what still needs a ruling.
+>
+> Last updated 20 Oct 2026. The Swappable Product category and the later detail-page
+> revisions came after the 29 ACs and are **not covered by any acceptance criterion** —
+> see [Swappable Product](#swappable-product-outside-the-29-acs).
 
 ---
 
@@ -20,6 +24,9 @@ inspection. Two carry caveats — see [Open questions](#open-questions).
 | 5.1.5 Pay-as-you-go | AC-16 | ✅ |
 | 5.2 Detail page | AC-17 – AC-25 | ✅ |
 | 5.3 Recent activity | AC-26 – AC-29 | ✅ |
+
+Built since, with no AC behind it: the **Swappable Product** category (PM note,
+21 Sep) and the detail-page layout, validation and responsive work.
 
 ---
 
@@ -57,6 +64,45 @@ inspection. Two carry caveats — see [Open questions](#open-questions).
   range and CSV export all functional (AC-28); row click opens the Order Management
   modal (AC-29).
 
+### Detail page — later revisions
+
+- **Fixed row height.** Usage alerts and Daily usage share a 482px row from `lg` up, so
+  adding a recipient no longer grows both blocks; the chart absorbs the slack (358px
+  rather than 230px). Below `lg` they stack and size independently.
+- **Recipients as chips.** Wrapping pills with an inline remove, instead of full-width
+  rows — eight addresses take three lines rather than eight. A comma-separated paste
+  becomes separate chips.
+- **Inline validation.** One line under the field carries the comma hint normally and
+  the error when there is one. Malformed addresses stay in the field to be corrected;
+  duplicates are named and dropped. Add is disabled only when the field is empty.
+- **Category icons** beside module names, matching Order Management's PRODUCT / TYPE
+  column.
+- **Responsive.** KPI cards 4 / 2 / 1; both tables scroll sideways below their natural
+  width rather than crushing their columns; page gutters drop to 16px on phones.
+
+### Swappable Product (outside the 29 ACs)
+
+From the PM's note of 21 Sep: benefits configured under the SaaS **Combine** category
+are cross-category — one point can be redeemed in Lounge, Fast Track or Dining — and
+engineering asked for them to be counted separately.
+
+- **Identified by `swappableCategories`** on `Product`, a list of slugs its points
+  cover. `clientStatus` stays `active`.
+- **Card** renders as an ordinary limited benefit — ring, used, "X of Y remaining".
+  No distinguishing badge; the name and Shuffle icon carry it.
+- **Header** replaces the description with the eligible-categories list, labelled
+  "Eligible across all templates" — the union across membership templates, since no
+  single template need cover all of them.
+- **Swappable Products Detail** table above Recent activity: membership code, swappable
+  entitlements, eligible products as icon chips, with CSV export.
+- **Membership templates are per environment** (`SWAPPABLE_MEMBERSHIPS`). Test carries
+  one template covering all nine categories, to exercise a full list; Production has
+  three narrower ones.
+- **Recent activity** reports the category each redemption landed in, not the benefit it
+  was drawn from, with a **Category** filter shown only where rows span more than one.
+  The same treatment now applies to **All Entitlements**, which previously repeated
+  "All Entitlements" on every row.
+
 ### Card affordance (post-PM feedback)
 
 User testing showed people didn't realise cards were clickable. The hover cue existed
@@ -83,6 +129,11 @@ and don't respond at all, which taught testers that cards are inert.
 | Unsupported-category copy | "This category is not available for this channel." | AC-07 says only "explanatory note" |
 | PAYG unit | "redemptions" | Matches the unlimited card's existing wording |
 | `payg` identifier | added to `Product.clientStatus` | AC-27 refers to `category = pyag`; spelled `payg` in code |
+| Swappable identification | `swappableCategories` on `Product`; `clientStatus` stays `active` | Swappable describes how the points behave, not whether the client holds the category — and avoids patching the status maps on the Categories page |
+| Swappable card badge | none | A violet "Swappable" badge was built and removed; the name and icon were judged enough |
+| Eligible-categories source | union of the environment's membership templates | "Eligible across all templates" is literally that; a static field would contradict the table below it |
+| Alerts / chart row height | 482px from `lg` up | Two clean chip rows above the helper line, with the chart taking the remainder |
+| Recipient validation | report, don't block | Add stays enabled for any non-empty input; a mixed paste adds what is valid and names the rest |
 
 ---
 
@@ -116,13 +167,21 @@ The All Entitlements page offers per-benefit alert thresholds and recipients for
 combined pool. Nothing can act on that. It appears only when every benefit is limited;
 with any unlimited benefit the volume-alert variant shows instead, which is defensible.
 
-### 5. Swappable products — not started
+### 5. Swappable products — built, but unspecified
 
-PM has proposed a "Swappable Product" category for cross-category (SaaS "Combine")
-entitlements, with a per-membership-template list on its detail page. Not in the 29 ACs;
-needs new criteria. The blocking question is **double counting**: if a swappable point
-can be spent on Lounge, does it also appear in Lounge's allocation? The summary banner
-sums across categories, so AC-01 – AC-04 likely reopen.
+Built per the PM's note, but **no acceptance criteria exist for it**, so there is no
+agreed definition of correct. Three things need a ruling:
+
+- **The units do not reconcile.** The KPI cards read 6,000 allocated / 2,400 used, while
+  the membership table reads 5 + 3 + 8. Both figures were invented separately. What does
+  "Swappable Entitlements" count — points for that template, eligible members, something
+  else? A developer cannot build this until it is settled, and the prototype currently
+  implies an answer that is almost certainly wrong.
+- **Double counting** appears resolved: engineering's "calculate these separately" means
+  the Combine pool is its own pool rather than a slice of Lounge's, so the banner sums it
+  once and AC-01 – AC-04 stand. Worth confirming explicitly.
+- **The list is flat.** The PM asked for an expandable per-template list; three rows fit
+  without it, a dozen would not.
 
 ---
 
@@ -132,6 +191,13 @@ sums across categories, so AC-01 – AC-04 likely reopen.
   client-side. The old AC requiring real API data was deleted in this revision, so
   nothing fails on it — but nothing is wired to an API either.
 - **Nothing persists.** Alert thresholds, recipients and Save fire a toast only.
+- **The swappable membership figures stand alone.** 5 + 3 + 8 across the three templates
+  does not reconcile with the 6,000-point allocation on the KPI cards above. Fine as a
+  picture, misleading as a specification — see [Open questions](#5-swappable-products--built-but-unspecified).
+- **`index.html` carries two Figma Make leftovers**: the title "Define Dashboard States
+  and Documentation" and a `<script>` loading `mcp.figma.com/.../capture.js`. Both are
+  stripped from the single-file build but remain in the repo, so they are live on the
+  GitHub Pages site.
 - **No typecheck in CI.** `typescript` isn't in `package.json` and `vite build` doesn't
   typecheck, so type errors don't surface. One pre-existing example:
   `tabs/ActiveEntitlementsTab.tsx` passes an `onManage` prop that `EntitlementCard`
@@ -164,8 +230,8 @@ reaching AA means expressing "greyed out" through colour rather than opacity.
 | `entitlements/EntitlementsSummaryBanner.tsx` | Summary banner and its aggregation |
 | `entitlements/EntitlementDetailPage.tsx` | Detail page: KPIs, alerts, chart, activity |
 | `entitlements/benefitStatus.ts` | Status derivation, ring colour, sort rank, `averageUsageRate` |
-| `entitlements/catalogData.ts` | Dragonpass category catalogue; `clientStatus` drives card type |
-| `entitlements/mockEntitlements.ts` | Per-environment entitlement mocks |
+| `entitlements/catalogData.ts` | Dragonpass category catalogue; `clientStatus` drives card type, `swappableCategories` marks the Combine product |
+| `entitlements/mockEntitlements.ts` | Per-environment entitlement mocks and `SWAPPABLE_MEMBERSHIPS` |
 | `charts/ChartPrimitives.tsx` | `UsageComboChart` added alongside existing primitives |
 
 ---
