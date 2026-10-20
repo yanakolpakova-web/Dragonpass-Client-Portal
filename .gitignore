@@ -10,3 +10,5 @@ dist-preview/
 # Handoff packages built for developers — large, and rebuilt rather than tracked
 DragonPass-Client-Portal-handoff/
 DragonPass-Client-Portal-handoff.zip
+benefits-module-handoff/
+benefits-module-handoff.zip
